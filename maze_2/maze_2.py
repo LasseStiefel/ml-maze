@@ -31,7 +31,8 @@ EXIT: tuple[int, int] | None = None
 # Coordinates are grid cells, starting at (0, 0) in the top-left corner.
 # Keep gaps by splitting a wall into shorter line segments.
 WALL_LINES = [
-    (0, 3, 20, 3),
+    (0, 3, 2, 3),
+    (4, 3, 20, 3),
     (23, 3, 24, 3),
     (0, 7, 1, 7),
     (4, 7, 24, 7),
