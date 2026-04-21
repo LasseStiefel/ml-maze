@@ -89,12 +89,18 @@ EXTRA_WALLS = {
     (27, 33),
 }
 
+SPIKEY_CELLS = {
+    (3, 3),
+    (30, 3),
+    (3, 7)
+}
 
 # ---------------------------------------------------------------------------
 # Game code
 # ---------------------------------------------------------------------------
 WALL_TILE = "##"
 FLOOR_TILE = "  "
+SPIKE_TILE = "><"
 PLAYER_TILE = "@@"
 EXIT_TILE = "[]"
 
@@ -105,6 +111,7 @@ class Maze:
     height: int
     start: tuple[int, int]
     exit: tuple[int, int]
+    spikes: frozenset[tuple[int, int]]
     walls: frozenset[tuple[int, int]]
 
     def in_bounds(self, cell: tuple[int, int]) -> bool:
@@ -148,6 +155,7 @@ def build_walls(
     height: int,
     start: tuple[int, int],
     exit_cell: tuple[int, int],
+    spikes: frozenset[tuple[int, int]] = frozenset(SPIKEY_CELLS),
 ) -> frozenset[tuple[int, int]]:
     walls = set(EXTRA_WALLS)
 
@@ -157,6 +165,8 @@ def build_walls(
     walls = {cell for cell in walls if 0 <= cell[0] < width and 0 <= cell[1] < height}
     walls.discard(start)
     walls.discard(exit_cell)
+    spikes.discard(start)
+    spikes.discard(exit_cell)
     return frozenset(walls)
 
 
@@ -187,7 +197,8 @@ class MazeGame:
                 self.try_move(-1, 0)
             elif key in (curses.KEY_RIGHT, ord("d"), ord("D")):
                 self.try_move(1, 0)
-
+            elif self.player in self.maze.spikes:
+                self.reset()  # Reset the game if the player steps on a spike.
     def setup_screen(self) -> None:
         self.screen.keypad(True)
         try:
@@ -211,6 +222,7 @@ class MazeGame:
         self.player = self.maze.start
         self.moves = 0
         self.won = False
+
 
     def try_move(self, dx: int, dy: int) -> None:
         if self.won:
