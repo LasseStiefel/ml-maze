@@ -9,7 +9,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 
-import maze_1 as maze_file
+import maze_1
+import maze_11
+
+MAZE_MODULES = [
+    maze_1,
+    maze_11,
+
+]
 
 ACTIONS = [
     ("up", (0, -1)),
@@ -20,8 +27,8 @@ ACTIONS = [
 
 MAZE_FINISHED = 100
 
-EPISODES = 400
-ROLLOUT_STEPS = 2048     #Amount of game steps to collect before update
+EPISODES = 2000
+ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
 GAMMA = 0.95            #How much future awards matter
 GAE_LAMBDA = 0.95
 CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
@@ -33,17 +40,22 @@ VALUE_COEF = 0.5
 
 
 # Builds Maze by getting dimenstions from maze.py. Uses build_walls function from maze.py1
-def build_maze():
-    width = maze_file.DEFAULT_WIDTH
-    height = maze_file.DEFAULT_HEIGHT
-    exit_cell = maze_file.resolve_exit(width, height)
+def build_maze(maze_module):
+    width = maze_module.DEFAULT_WIDTH
+    height = maze_module.DEFAULT_HEIGHT
+    exit_cell = maze_module.resolve_exit(width, height)
 
-    return maze_file.Maze(
+    return maze_module.Maze(
         width=width,
         height=height,
-        start=maze_file.START,
+        start=maze_module.START,
         exit=exit_cell,
-        walls=maze_file.build_walls(width, height, maze_file.START, exit_cell),
+        walls=maze_module.build_walls(
+            width,
+            height, 
+            maze_module.START,
+            exit_cell,
+        ),
     )
 
 def move(maze, state, action_index):
@@ -306,25 +318,21 @@ def update_model(model, optimizer, rollout):
             loss.backward()
             optimizer.step()
 
-def train(maze):
-    input_size = len(encode_state(maze, maze.start))
+def train(mazes):
+    input_size = len(encode_state(mazes[0], mazes[0].start))
     action_size = len(ACTIONS)
 
     model = ActorCritic(input_size, action_size)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    max_steps = maze.width * maze.height * 4
     recent_wins = deque(maxlen=100)
     recent_rewards = deque(maxlen=100)
 
-    all_visits = {}
-
     for episode in range(1, EPISODES + 1):
+        maze = random.choice(mazes)
+        max_steps = maze.width * maze.height * 4
+
         rollout, rewards, wins, visits = collect_rollout(maze, model, max_steps)
-
-        for cell, count in visits.items():
-            all_visits[cell] = all_visits.get(cell, 0) + count
-
         update_model(model, optimizer, rollout)
 
         recent_rewards.extend(rewards)
@@ -340,7 +348,8 @@ def train(maze):
                 f"recent_success={success_rate:.0%}"
             )
 
-    return model, all_visits
+    return model
+
 
 def choose_greedy_action(model, maze, state):
     state_tensor = encode_state(maze, state)
@@ -385,20 +394,23 @@ def main():
     random.seed(1)
     torch.manual_seed(1)
 
-    maze = build_maze()
-    model, all_visits = train(maze)
-    torch.save(model.state_dict(), "ppo_maze_1.pt")
+    mazes = [build_maze(module) for module in MAZE_MODULES]
 
-    path = extract_path(maze, model)
+    model = train(mazes)
 
-    print()
-    print(f"learned_path_length={len(path) - 1}")
-    print(f"shortest_path_length={shortest_path_length(maze)}")
-    print(f"reached_exit={path[-1] == maze.exit}")
+    torch.save(model.state_dict(), "ppo_multi_maze.pt")
 
-    print_heatmap(maze, all_visits)
-    print()
-    print_path(maze, path)
+    for index, maze in enumerate(mazes, start=1):
+        path = extract_path(maze, model)
+
+        print()
+        print(f"maze={index}")
+        print(f"learned_path_length={len(path) - 1}")
+        print(f"shortest_path_length={shortest_path_length(maze)}")
+        print(f"reached_exit={path[-1] == maze.exit}")
+        print()
+        print_path(maze, path)
+
 
 
 if __name__ == "__main__":
