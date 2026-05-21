@@ -1,0 +1,313 @@
+EPISODES = 500
+ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
+GAMMA = 0.95            #How much future awards matter
+GAE_LAMBDA = 0.95
+CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
+LEARNING_RATE = 3e-4
+UPDATE_EPOCHS = 6
+MINIBATCH_SIZE = 128
+ENTROPY_COEF = 0.2     #Encourages exploration
+VALUE_COEF = 0.5
+
+episode=50 avg_reward=-1973.7 recent_success=20%
+episode=100 avg_reward=-1571.1 recent_success=16%
+episode=150 avg_reward=-1304.6 recent_success=30%
+episode=200 avg_reward=-1494.2 recent_success=9%
+episode=250 avg_reward=-1267.8 recent_success=2%
+episode=300 avg_reward=-773.6 recent_success=66%
+episode=350 avg_reward=-702.5 recent_success=79%
+episode=400 avg_reward=-782.1 recent_success=51%
+episode=450 avg_reward=-227.0 recent_success=85%
+episode=500 avg_reward=-97.2 recent_success=99%
+
+maze=1
+learned_path_length=1024
+shortest_path_length=30
+reached_exit=False
+
+S                               
+..    ##          ##    ######  
+      ##    ##    ##            
+      ##    ##    ##    ##      
+  ########  ##    ##    ##      
+      ##    ##          ########
+  ##        ##      ##  ##      
+                ##      ##      
+    ##  ##  ##########          
+    ##    ##    ##          ##  
+######    ##    ##    ##        
+    ##    ##    ##    ##        
+    ##    ##        ##########  
+          ##  ##      ##        
+          ##          ##        
+                              E 
+
+maze=2
+learned_path_length=1024
+shortest_path_length=30
+reached_exit=False
+
+S           ##                  
+..    ##    ##          ##      
+      ####  ##    ##    ##      
+      ##    ########    ##      
+  ######    ##    ##    ########
+      ##      ##  ##    ##      
+  ##  ##          ####          
+        ########  ##            
+          ##        ##########  
+    ##    ##          ##        
+    ##    ##    ##    ##  ##    
+  ##########    ##    ##        
+    ##    ##    ##    ##########
+    ##      ##  ##    ##        
+    ##          ##          ##  
+                ##            E 
+
+maze=3
+learned_path_length=1024
+shortest_path_length=108
+reached_exit=False
+
+S                               
+..##        ##                  
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################    
+                              E 
+
+-------------------------------------------------------------
+EPISODES = 1000
+ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
+GAMMA = 0.95            #How much future awards matter
+GAE_LAMBDA = 0.95
+CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
+LEARNING_RATE = 3e-4
+UPDATE_EPOCHS = 6
+MINIBATCH_SIZE = 128
+ENTROPY_COEF = 0.2     #Encourages exploration
+VALUE_COEF = 0.5
+
+maze=1
+learned_path_length=30
+shortest_path_length=30
+reached_exit=True
+
+S ..............                
+      ##      ....##    ######  
+      ##    ##  ..##            
+      ##    ##  ..##    ##      
+  ########  ##  ..##    ##      
+      ##    ##  ....    ########
+  ##        ##    ..##  ##      
+                ##......##      
+    ##  ##  ##########....      
+    ##    ##    ##      ....##  
+######    ##    ##    ##  ....  
+    ##    ##    ##    ##    ....
+    ##    ##        ##########..
+          ##  ##      ##      ..
+          ##          ##      ..
+                              E 
+
+maze=2
+learned_path_length=1024
+shortest_path_length=30
+reached_exit=False
+
+S ..........##                  
+      ##  ..##          ##      
+      ####..##    ##    ##      
+      ##    ########    ##      
+  ######    ##    ##    ########
+      ##      ##  ##    ##      
+  ##  ##          ####          
+        ########  ##            
+          ##        ##########  
+    ##    ##          ##        
+    ##    ##    ##    ##  ##    
+  ##########    ##    ##        
+    ##    ##    ##    ##########
+    ##      ##  ##    ##        
+    ##          ##          ##  
+                ##            E 
+
+maze=3
+learned_path_length=1024
+shortest_path_length=108
+reached_exit=False
+
+S ..............  ..            
+  ##        ##......            
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################    
+                              E 
+
+
+
+
+
+
+EPISODES = 3000
+ROLLOUT_STEPS = 4096  
+exploration 0.25
+maze=1
+learned_path_length=1024
+shortest_path_length=30
+reached_exit=False
+
+S ................              
+      ##          ##    ######  
+      ##    ##    ##            
+      ##    ##    ##    ##      
+  ########  ##    ##    ##      
+      ##    ##          ########
+  ##        ##      ##  ##      
+                ##      ##      
+    ##  ##  ##########          
+    ##    ##    ##          ##  
+######    ##    ##    ##        
+    ##    ##    ##    ##        
+    ##    ##        ##########  
+          ##  ##      ##        
+          ##          ##        
+                              E 
+
+maze=2
+learned_path_length=30
+shortest_path_length=30
+reached_exit=True
+
+S ..........##                  
+      ##  ..##          ##      
+      ####..##    ##    ##      
+      ##  ..########    ##      
+  ######  ..##    ##    ########
+      ##  ..  ##  ##    ##      
+  ##  ##  ........####          
+        ########..##            
+          ##    ....##########  
+    ##    ##      ..  ##        
+    ##    ##    ##....##  ##    
+  ##########    ##  ..##        
+    ##    ##    ##  ..##########
+    ##      ##  ##  ..##        
+    ##          ##  ......  ##  
+                ##      ......E 
+
+maze=3
+learned_path_length=1024
+shortest_path_length=108
+reached_exit=False
+
+S ................              
+  ##        ##                  
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################    
+                              E 
+
+
+
+
+
+
+EPISODES = 3000
+ROLLOUT_STEPS = 4096  
+Exploration 0.3
+maze=1
+learned_path_length=30
+shortest_path_length=30
+reached_exit=True
+
+S ........                      
+      ##........  ##    ######  
+      ##    ##....##            
+      ##    ##  ..##    ##      
+  ########  ##  ..##    ##      
+      ##    ##  ..      ########
+  ##        ##  ....##  ##      
+                ##......##      
+    ##  ##  ##########..        
+    ##    ##    ##    ....  ##  
+######    ##    ##    ##..      
+    ##    ##    ##    ##........
+    ##    ##        ##########..
+          ##  ##      ##      ..
+          ##          ##      ..
+                              E 
+
+maze=2
+learned_path_length=30
+shortest_path_length=30
+reached_exit=True
+
+S ........  ##                  
+      ##....##          ##      
+      ####..##    ##    ##      
+      ##  ..########    ##      
+  ######  ..##    ##    ########
+      ##  ....##  ##    ##      
+  ##  ##    ......####          
+        ########..##            
+          ##    ....##########  
+    ##    ##      ..  ##        
+    ##    ##    ##..  ##  ##    
+  ##########    ##..  ##        
+    ##    ##    ##..  ##########
+    ##      ##  ##..  ##        
+    ##          ##..        ##  
+                ##............E 
+
+maze=3
+learned_path_length=1024
+shortest_path_length=108
+reached_exit=False
+
+S ........                      
+  ##    ..  ##                  
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################  ##
+                                
+    ############################
+                                
+############################    
+                              E 

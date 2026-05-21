@@ -1,0 +1,194 @@
+EPISODES = 2000
+ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
+GAMMA = 0.95            #How much future awards matter
+GAE_LAMBDA = 0.95
+CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
+LEARNING_RATE = 3e-4
+UPDATE_EPOCHS = 6
+MINIBATCH_SIZE = 128
+ENTROPY_COEF = 0.1     #Encourages exploration
+VALUE_COEF = 0.5
+
+episode=50 avg_reward=-2011.3 recent_success=21%
+episode=100 avg_reward=-1871.2 recent_success=4%
+episode=150 avg_reward=-1605.5 recent_success=6%
+episode=200 avg_reward=-1618.4 recent_success=4%
+episode=250 avg_reward=-1339.9 recent_success=0%
+episode=300 avg_reward=-1158.4 recent_success=0%
+episode=350 avg_reward=-1187.5 recent_success=0%
+episode=400 avg_reward=-1130.3 recent_success=0%
+episode=450 avg_reward=-1140.4 recent_success=0%
+episode=500 avg_reward=-1137.3 recent_success=0%
+episode=550 avg_reward=-1115.1 recent_success=0%
+episode=600 avg_reward=-1101.9 recent_success=0%
+episode=650 avg_reward=-1107.2 recent_success=1%
+episode=700 avg_reward=-1114.2 recent_success=0%
+episode=750 avg_reward=-1106.3 recent_success=2%
+episode=800 avg_reward=-1107.6 recent_success=1%
+episode=850 avg_reward=-1103.2 recent_success=0%
+episode=900 avg_reward=-1125.0 recent_success=0%
+episode=950 avg_reward=-1095.7 recent_success=0%
+episode=1000 avg_reward=-1033.3 recent_success=10%
+episode=1050 avg_reward=-313.3 recent_success=92%
+episode=1100 avg_reward=-735.5 recent_success=83%
+episode=1150 avg_reward=-1399.4 recent_success=20%
+episode=1200 avg_reward=-1169.2 recent_success=0%
+episode=1250 avg_reward=-1131.6 recent_success=0%
+episode=1300 avg_reward=-1129.0 recent_success=0%
+episode=1350 avg_reward=-1116.8 recent_success=0%
+episode=1400 avg_reward=-1094.9 recent_success=0%
+episode=1450 avg_reward=-1091.2 recent_success=0%
+episode=1500 avg_reward=-1091.0 recent_success=0%
+episode=1550 avg_reward=-1092.1 recent_success=0%
+episode=1600 avg_reward=-1095.1 recent_success=0%
+episode=1650 avg_reward=-1094.6 recent_success=0%
+episode=1700 avg_reward=-1088.7 recent_success=0%
+episode=1750 avg_reward=-1090.3 recent_success=0%
+episode=1800 avg_reward=-1092.4 recent_success=0%
+episode=1850 avg_reward=-1092.7 recent_success=0%
+episode=1900 avg_reward=-1091.2 recent_success=0%
+episode=1950 avg_reward=-1092.4 recent_success=0%
+episode=2000 avg_reward=-1089.8 recent_success=0%
+
+maze=1
+learned_path_length=1024
+shortest_path_length=30
+reached_exit=False
+
+S                               
+..    ##          ##    ######  
+..    ##    ##    ##            
+..    ##    ##    ##    ##      
+..########  ##    ##    ##      
+..    ##    ##          ########
+..##        ##      ##  ##      
+....            ##      ##      
+....##  ##  ##########          
+    ##    ##    ##          ##  
+######    ##    ##    ##        
+    ##    ##    ##    ##        
+    ##    ##        ##########  
+          ##  ##      ##        
+          ##          ##        
+                              E 
+
+maze=2
+learned_path_length=1024
+shortest_path_length=30
+reached_exit=False
+
+S           ##                  
+..    ##    ##          ##      
+..    ####  ##    ##    ##      
+..    ##    ########    ##      
+..######    ##    ##    ########
+..    ##      ##  ##    ##      
+..##  ##          ####          
+..      ########  ##            
+....      ##        ##########  
+  ..##    ##          ##        
+    ##    ##    ##    ##  ##    
+  ##########    ##    ##        
+    ##    ##    ##    ##########
+    ##      ##  ##    ##        
+    ##          ##          ##  
+                ##            E 
+
+-------------------------------------------------------------------------
+increase exploration from 0.1 to 0.2
+
+EPISODES = 2000
+ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
+GAMMA = 0.95            #How much future awards matter
+GAE_LAMBDA = 0.95
+CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
+LEARNING_RATE = 3e-4
+UPDATE_EPOCHS = 6
+MINIBATCH_SIZE = 128
+ENTROPY_COEF = 0.2     #Encourages exploration
+VALUE_COEF = 0.5
+
+episode=50 avg_reward=-1830.9 recent_success=37%
+episode=100 avg_reward=-1626.4 recent_success=48%
+episode=150 avg_reward=-467.8 recent_success=95%
+episode=200 avg_reward=-1494.1 recent_success=61%
+episode=250 avg_reward=-1244.8 recent_success=72%
+episode=300 avg_reward=-814.9 recent_success=88%
+episode=350 avg_reward=-120.2 recent_success=100%
+episode=400 avg_reward=-9.1 recent_success=100%
+episode=450 avg_reward=45.6 recent_success=100%
+episode=500 avg_reward=64.2 recent_success=100%
+episode=550 avg_reward=47.0 recent_success=100%
+episode=600 avg_reward=55.0 recent_success=100%
+episode=650 avg_reward=-47.7 recent_success=99%
+episode=700 avg_reward=66.7 recent_success=100%
+episode=750 avg_reward=68.3 recent_success=100%
+episode=800 avg_reward=70.2 recent_success=100%
+episode=850 avg_reward=70.7 recent_success=100%
+episode=900 avg_reward=70.3 recent_success=100%
+episode=950 avg_reward=70.9 recent_success=100%
+episode=1000 avg_reward=70.0 recent_success=100%
+episode=1050 avg_reward=68.9 recent_success=100%
+episode=1100 avg_reward=70.5 recent_success=100%
+episode=1150 avg_reward=70.9 recent_success=100%
+episode=1200 avg_reward=70.9 recent_success=100%
+episode=1250 avg_reward=70.0 recent_success=100%
+episode=1300 avg_reward=70.7 recent_success=100%
+episode=1350 avg_reward=70.8 recent_success=100%
+episode=1400 avg_reward=70.3 recent_success=100%
+episode=1450 avg_reward=70.3 recent_success=100%
+episode=1500 avg_reward=70.7 recent_success=100%
+episode=1550 avg_reward=71.0 recent_success=100%
+episode=1600 avg_reward=70.9 recent_success=100%
+episode=1650 avg_reward=70.7 recent_success=100%
+episode=1700 avg_reward=70.8 recent_success=100%
+episode=1750 avg_reward=70.5 recent_success=100%
+episode=1800 avg_reward=70.8 recent_success=100%
+episode=1850 avg_reward=70.9 recent_success=100%
+episode=1900 avg_reward=70.9 recent_success=100%
+episode=1950 avg_reward=70.3 recent_success=100%
+episode=2000 avg_reward=70.8 recent_success=100%
+
+maze=1
+learned_path_length=30
+shortest_path_length=30
+reached_exit=True
+
+S ............                  
+      ##    ....  ##    ######  
+      ##    ##..  ##            
+      ##    ##....##    ##      
+  ########  ##  ..##    ##      
+      ##    ##  ........########
+  ##        ##      ##..##      
+                ##    ..##      
+    ##  ##  ##########..        
+    ##    ##    ##    ......##  
+######    ##    ##    ##  ....  
+    ##    ##    ##    ##    ....
+    ##    ##        ##########..
+          ##  ##      ##      ..
+          ##          ##      ..
+                              E 
+
+maze=2
+learned_path_length=30
+shortest_path_length=30
+reached_exit=True
+
+S ..........##                  
+      ##  ..##          ##      
+      ####..##    ##    ##      
+      ##  ..########    ##      
+  ######  ..##    ##    ########
+      ##  ....##  ##    ##      
+  ##  ##    ......####          
+        ########..##            
+          ##    ..  ##########  
+    ##    ##    ....  ##        
+    ##    ##    ##..  ##  ##    
+  ##########    ##....##        
+    ##    ##    ##  ..##########
+    ##      ##  ##  ..##        
+    ##          ##  ....    ##  
+                ##    ........E 

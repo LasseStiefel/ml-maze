@@ -11,10 +11,12 @@ from torch.distributions import Categorical
 
 import maze_1
 import maze_11
+import maze_13
 
 MAZE_MODULES = [
     maze_1,
     maze_11,
+    maze_13,
 
 ]
 
@@ -27,15 +29,15 @@ ACTIONS = [
 
 MAZE_FINISHED = 100
 
-EPISODES = 2000
-ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
+EPISODES = 3000
+ROLLOUT_STEPS = 2048     #Amount of game steps to collect before update
 GAMMA = 0.95            #How much future awards matter
 GAE_LAMBDA = 0.95
 CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
 LEARNING_RATE = 3e-4
 UPDATE_EPOCHS = 6
 MINIBATCH_SIZE = 128
-ENTROPY_COEF = 0.1     #Encourages exploration
+ENTROPY_COEF = 0.3     #Encourages exploration
 VALUE_COEF = 0.5
 
 

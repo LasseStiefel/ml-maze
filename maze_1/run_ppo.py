@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-import maze_1 as maze_file
+import maze_14 as maze_file
 from ppo import ACTIONS, ActorCritic, encode_state, extract_path, print_path, shortest_path_length, move
 
 
@@ -71,7 +71,7 @@ def main():
     action_size = len(ACTIONS)
 
     model = ActorCritic(input_size, action_size)
-    model.load_state_dict(torch.load("ppo_maze_1.pt"))
+    model.load_state_dict(torch.load("ppo_multi_maze.pt"))
     model.eval()
 
     print_step_by_step_path(maze, model)
