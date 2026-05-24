@@ -15,7 +15,15 @@ import maze_13
 import maze_14
 
 MIN_MAZE_WEIGHT = 0.5
-MAX_MAZE_WEIGHT = 5.0
+MAX_MAZE_WEIGHT = 3.0
+
+MIN_MAZE_WEIGHT_2 = 0.75
+MAX_MAZE_WEIGHT_2 = 4.0
+
+MIN_MAZE_WEIGHT_h = 1
+MAX_MAZE_WEIGHT_h = 10
+
+
 
 MAZE_MODULES = [
     maze_14,
@@ -36,8 +44,8 @@ EPISODES = 2000
 ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
 GAMMA = 0.99            #How much future awards matter
 GAE_LAMBDA = 0.95
-CLIP_EPSILON = 0.1      #Prevent large policy updates (PPO's incremntal learning)
-LEARNING_RATE = 5e-5
+CLIP_EPSILON = 0.3      #Prevent large policy updates (PPO's incremntal learning)
+LEARNING_RATE = 1e-4
 UPDATE_EPOCHS = 2
 MINIBATCH_SIZE = 512
 ENTROPY_COEF = 0.2     #Encourages exploration
@@ -438,9 +446,18 @@ def train(mazes):
                 sum(maze_recent_wins[maze_index])
                 / max(1, len(maze_recent_wins[maze_index]))
             )
-            reward_weight = MIN_MAZE_WEIGHT + (
-                MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
-            ) * (1.0 - maze_success_rate)
+            if maze_index == 1 or 4:
+                reward_weight = MIN_MAZE_WEIGHT_h + (
+                    MAX_MAZE_WEIGHT_h - MIN_MAZE_WEIGHT_h
+                ) * (1.0 - maze_success_rate)
+            elif maze_index == 2 or 5:
+                reward_weight = MIN_MAZE_WEIGHT_2 + (
+                    MAX_MAZE_WEIGHT_2 - MIN_MAZE_WEIGHT_2
+                ) * (1.0 - maze_success_rate)
+            else:
+                reward_weight = MIN_MAZE_WEIGHT + (
+                    MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
+                ) * (1.0 - maze_success_rate)
 
             rollout, rewards, wins, visits = collect_rollout(
                 maze,
@@ -497,9 +514,18 @@ def train(mazes):
                     sum(maze_recent_wins[maze_index])
                     / max(1, len(maze_recent_wins[maze_index]))
                 )
-                maze_reward_weight = MIN_MAZE_WEIGHT + (
-                    MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
-                ) * (1.0 - maze_success_rate)
+                if maze_index == 1 or 4:
+                    reward_weight = MIN_MAZE_WEIGHT_h + (
+                        MAX_MAZE_WEIGHT_h - MIN_MAZE_WEIGHT_h
+                    ) * (1.0 - maze_success_rate)
+                elif maze_index == 2 or 5:
+                    reward_weight = MIN_MAZE_WEIGHT_2 + (
+                        MAX_MAZE_WEIGHT_2 - MIN_MAZE_WEIGHT_2
+                    ) * (1.0 - maze_success_rate)
+                else:
+                    reward_weight = MIN_MAZE_WEIGHT + (
+                        MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
+                    ) * (1.0 - maze_success_rate)
 
                 print(
                     f"  maze={maze_index + 1} "

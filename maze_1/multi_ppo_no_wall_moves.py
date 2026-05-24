@@ -14,18 +14,12 @@ import maze_11
 import maze_13
 import maze_14
 
-MIN_MAZE_WEIGHT = 0.5
-MAX_MAZE_WEIGHT = 3.0
-
-MIN_MAZE_WEIGHT_2 = 0.75
-MAX_MAZE_WEIGHT_2 = 4.0
-
-MIN_MAZE_WEIGHT_h = 1
-MAX_MAZE_WEIGHT_h = 10
+MIN_MAZE_WEIGHT = 1.00
+MAX_MAZE_WEIGHT = 4.00
 
 MAZE_MODULES = [
-    maze_13,
     maze_14,
+    maze_13,
     maze_11,
     maze_13,
     maze_14, 
@@ -42,7 +36,7 @@ EPISODES = 2000
 ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
 GAMMA = 0.99            #How much future awards matter
 GAE_LAMBDA = 0.95
-CLIP_EPSILON = 0.3      #Prevent large policy updates (PPO's incremntal learning)
+CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
 LEARNING_RATE = 1e-4
 UPDATE_EPOCHS = 4
 MINIBATCH_SIZE = 512
@@ -95,7 +89,7 @@ def move(maze, state, action_index, distance_map=None):
     next_state = (x + dx, y + dy)
 
     if not maze.is_open(next_state):
-        return state, -5, False     # hit wall -> stay in same state -> reward -5 -> episode not done
+        return state, -15, False     # hit wall -> stay in same state -> reward -5 -> episode not done
 
     if next_state == maze.exit:
         return next_state, MAZE_FINISHED, True      # reached exit -> reward 100 -> episode done
@@ -130,6 +124,12 @@ def action_mask(maze, state):
 
 def apply_action_mask(logits, masks):
     return logits.masked_fill(~masks, -1e9)
+
+def scale_positive_rewards(rewards, reward_weight):
+    return [
+        reward * reward_weight if reward > 0 else reward
+        for reward in rewards
+    ]
 
 def build_observation_cache(maze):
     states = {}
@@ -429,18 +429,9 @@ def train(mazes):
                 sum(maze_recent_wins[maze_index])
                 / max(1, len(maze_recent_wins[maze_index]))
             )
-            if maze_index == 1 or 4:
-                reward_weight = MIN_MAZE_WEIGHT_h + (
-                    MAX_MAZE_WEIGHT_h - MIN_MAZE_WEIGHT_h
-                ) * (1.0 - maze_success_rate)
-            elif maze_index == 2 or 5:
-                reward_weight = MIN_MAZE_WEIGHT_2 + (
-                    MAX_MAZE_WEIGHT_2 - MIN_MAZE_WEIGHT_2
-                ) * (1.0 - maze_success_rate)
-            else:
-                reward_weight = MIN_MAZE_WEIGHT + (
-                    MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
-                ) * (1.0 - maze_success_rate)
+            reward_weight = MIN_MAZE_WEIGHT + (
+                MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
+            ) * (1.0 - maze_success_rate)
 
             rollout, rewards, wins, visits = collect_rollout(
                 maze,
@@ -451,14 +442,8 @@ def train(mazes):
                 mask_cache,
             )
 
-            rollout.rewards = [
-                reward * reward_weight
-                for reward in rollout.rewards
-            ]
-            rewards = [
-                reward * reward_weight
-                for reward in rewards
-            ]
+            rollout.rewards = scale_positive_rewards(rollout.rewards, reward_weight)
+            rewards = scale_positive_rewards(rewards, reward_weight)
 
             rollouts.append(rollout)
             recent_rewards.extend(rewards)
@@ -488,24 +473,15 @@ def train(mazes):
                     sum(maze_recent_wins[maze_index])
                     / max(1, len(maze_recent_wins[maze_index]))
                 )
-                if maze_index == 1 or 4:
-                    reward_weight = MIN_MAZE_WEIGHT_h + (
-                        MAX_MAZE_WEIGHT_h - MIN_MAZE_WEIGHT_h
-                    ) * (1.0 - maze_success_rate)
-                elif maze_index == 2 or 5:
-                    reward_weight = MIN_MAZE_WEIGHT_2 + (
-                        MAX_MAZE_WEIGHT_2 - MIN_MAZE_WEIGHT_2
-                    ) * (1.0 - maze_success_rate)
-                else:
-                    reward_weight = MIN_MAZE_WEIGHT + (
-                        MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
-                    ) * (1.0 - maze_success_rate)
+                maze_reward_weight = MIN_MAZE_WEIGHT + (
+                    MAX_MAZE_WEIGHT - MIN_MAZE_WEIGHT
+                ) * (1.0 - maze_success_rate)
 
                 print(
                     f"  maze={maze_index + 1} "
                     f"avg_reward={maze_avg_reward:.1f} "
                     f"success={maze_success_rate:.0%} "
-                    f"weight={maze_reward_weight:.2f}"
+                    f"positive_weight={maze_reward_weight:.2f}"
                 )
 
     return model
@@ -575,8 +551,8 @@ def print_training_parameters():
     print()
     print("Training parameters")
     print(f"mazes={[module.__name__ for module in MAZE_MODULES]}")
-    print(f"min_maze_weight={MIN_MAZE_WEIGHT}")
-    print(f"max_maze_weight={MAX_MAZE_WEIGHT}")
+    print(f"min_positive_reward_weight={MIN_MAZE_WEIGHT}")
+    print(f"max_positive_reward_weight={MAX_MAZE_WEIGHT}")
     print(f"episodes={EPISODES}")
     print(f"rollout_steps={ROLLOUT_STEPS}")
     print(f"gamma={GAMMA}")
@@ -599,7 +575,7 @@ def main():
 
     model = train(mazes)
 
-    torch.save(model.state_dict(), "ppo_multi_maze_reward_both_0.2_0.3clip.pt")
+    torch.save(model.state_dict(), "ppo_multi_maze_no_wall_moves.pt")
 
     print_training_parameters()
 

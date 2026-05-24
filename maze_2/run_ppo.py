@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-import maze_2 as maze_file
+import maze_1 as maze_file
 from ppo import ACTIONS, ActorCritic, encode_state, extract_path, print_path, shortest_path_length, move
 
 
