@@ -10,16 +10,17 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 import maze_1
-#import maze_11
+import maze_11
 import maze_13
 import maze_14
 
 MAZE_MODULES = [
     maze_1,
-    #maze_11,
+    maze_11,
     maze_13,
+    maze_13,
+    maze_14, 
     maze_14,
-
 ]
 
 ACTIONS = [
@@ -29,22 +30,20 @@ ACTIONS = [
     ("right", (1, 0)),
 ]
 
-
-
-EPISODES = 200
-ROLLOUT_STEPS = 8192     #Amount of game steps to collect before update
-GAMMA = 0.95            #How much future awards matter
+EPISODES = 500
+ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
+GAMMA = 0.99            #How much future awards matter
 GAE_LAMBDA = 0.95
 CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
-LEARNING_RATE = 3e-4
-UPDATE_EPOCHS = 2
+LEARNING_RATE = 1e-4
+UPDATE_EPOCHS = 4
 MINIBATCH_SIZE = 512
-ENTROPY_COEF = 0.15     #Encourages exploration
+ENTROPY_COEF = 0.1     #Encourages exploration
 VALUE_COEF = 0.5
 
 MAZE_FINISHED = 500
 CLOSER = -0.5
-FURTHER = -1.5
+FURTHER = -0.75
 
 # Builds Maze by getting dimenstions from maze.py. Uses build_walls function from maze.py1
 def build_maze(maze_module):
@@ -65,12 +64,24 @@ def build_maze(maze_module):
         ),
     )
 
-def distance_to_exit(maze, state):
-    x, y = state
-    ex, ey = maze.exit
-    return abs(ex - x) + abs(ey - y)
+def build_distance_map(maze):
+    queue = deque([maze.exit])
+    distances = {maze.exit: 0}
 
-def move(maze, state, action_index):
+    while queue:
+        state = queue.popleft()
+        x, y = state
+
+        for _name, (dx, dy) in ACTIONS:
+            next_state = (x + dx, y + dy)
+
+            if maze.is_open(next_state) and next_state not in distances:
+                distances[next_state] = distances[state] + 1
+                queue.append(next_state)
+
+    return distances
+
+def move(maze, state, action_index, distance_map=None):
     _name, (dx, dy) = ACTIONS[action_index]
     x, y = state
     next_state = (x + dx, y + dy)
@@ -82,8 +93,14 @@ def move(maze, state, action_index):
         return next_state, MAZE_FINISHED, True      # reached exit -> reward 100 -> episode done
 
     #return next_state, -1, False    # valid normal step -> move to next state -> reward -1 -> episode not done
-    old_distance = distance_to_exit(maze, state)
-    new_distance = distance_to_exit(maze, next_state)
+    if distance_map is None:
+        return next_state, -1, False
+
+    old_distance = distance_map.get(state)
+    new_distance = distance_map.get(next_state)
+
+    if old_distance is None or new_distance is None:
+        return next_state, -1, False
 
     if new_distance < old_distance:
         return next_state, CLOSER, False
@@ -92,6 +109,19 @@ def move(maze, state, action_index):
         return next_state, FURTHER, False
 
     return next_state, -1, False
+
+def action_mask(maze, state):
+    x, y = state
+    return torch.tensor(
+        [
+            maze.is_open((x + dx, y + dy))
+            for _name, (dx, dy) in ACTIONS
+        ],
+        dtype=torch.bool,
+    )
+
+def apply_action_mask(logits, masks):
+    return logits.masked_fill(~masks, -1e9)
 
 # is the devision by maze size necessary or maybe a codex complication ?
 def encode_state(maze, state):
@@ -139,15 +169,16 @@ class ActorCritic(nn.Module):
         values = self.critic(hidden).squeeze(-1)
         return logits, values
 
-    def act(self, state_tensor):
+    def act(self, state_tensor, mask):
         logits, value = self.forward(state_tensor.unsqueeze(0))
-        dist = Categorical(logits=logits)
+        masked_logits = apply_action_mask(logits, mask.unsqueeze(0))
+        dist = Categorical(logits=masked_logits)
         action = dist.sample()
 
         return action.item(), dist.log_prob(action).squeeze(0), value.squeeze(0)
     
-def collect_rollout(maze, model, max_steps):
-    rollout = Rollout([], [], [], [], [], [])
+def collect_rollout(maze, model, max_steps, distance_map):
+    rollout = Rollout([], [], [], [], [], [], [])
     episode_rewards = []
     episode_wins = []
     visits = {}
@@ -158,14 +189,16 @@ def collect_rollout(maze, model, max_steps):
 
     while len(rollout.states) < ROLLOUT_STEPS:
         state_tensor = encode_state(maze, state)
+        mask = action_mask(maze, state)
         visits[state] = visits.get(state, 0) + 1
 
         with torch.no_grad():
-            action, log_prob, value = model.act(state_tensor)
+            action, log_prob, value = model.act(state_tensor, mask)
 
-        next_state, reward, done = move(maze, state, action)
+        next_state, reward, done = move(maze, state, action, distance_map)
 
         rollout.states.append(state_tensor)
+        rollout.masks.append(mask)
         rollout.actions.append(action)
         rollout.rewards.append(reward)
         rollout.dones.append(done)
@@ -294,6 +327,7 @@ def shortest_path_length(maze):
 
 def update_model(model, optimizer, rollout):
     states = torch.stack(rollout.states)
+    masks = torch.stack(rollout.masks)
     actions = torch.tensor(rollout.actions, dtype=torch.long)
     old_log_probs = torch.stack(rollout.log_probs).detach()
 
@@ -314,7 +348,10 @@ def update_model(model, optimizer, rollout):
             batch_advantages = advantages[batch_indices]
             batch_returns = returns[batch_indices]
 
+            batch_masks = masks[batch_indices]
+
             logits, values = model(batch_states)
+            logits = apply_action_mask(logits, batch_masks)
             dist = Categorical(logits=logits)
 
             new_log_probs = dist.log_prob(batch_actions)
@@ -348,21 +385,32 @@ def train(mazes):
 
     model = ActorCritic(input_size, action_size)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    distance_maps = [build_distance_map(maze) for maze in mazes]
 
     recent_wins = deque(maxlen=100)
     recent_rewards = deque(maxlen=100)
 
+    maze_recent_wins = [deque(maxlen=100) for _ in mazes]
+    maze_recent_rewards = [deque(maxlen=100) for _ in mazes]
+
     for episode in range(1, EPISODES + 1):
         rollouts = []
 
-        for maze in mazes:
+        for maze_index, (maze, distance_map) in enumerate(zip(mazes, distance_maps)):
             max_steps = maze.width * maze.height * 4
 
-            rollout, rewards, wins, visits = collect_rollout(maze, model, max_steps)
+            rollout, rewards, wins, visits = collect_rollout(
+                maze,
+                model,
+                max_steps,
+                distance_map,
+            )
 
             rollouts.append(rollout)
             recent_rewards.extend(rewards)
             recent_wins.extend(wins)
+            maze_recent_rewards[maze_index].extend(rewards)
+            maze_recent_wins[maze_index].extend(wins)
 
         combined_rollout = combine_rollouts(rollouts)
         update_model(model, optimizer, combined_rollout)
@@ -377,14 +425,32 @@ def train(mazes):
                 f"recent_success={success_rate:.0%}"
             )
 
+            for maze_index in range(len(mazes)):
+                maze_avg_reward = (
+                    sum(maze_recent_rewards[maze_index])
+                    / max(1, len(maze_recent_rewards[maze_index]))
+                )
+                maze_success_rate = (
+                    sum(maze_recent_wins[maze_index])
+                    / max(1, len(maze_recent_wins[maze_index]))
+                )
+
+                print(
+                    f"  maze={maze_index + 1} "
+                    f"avg_reward={maze_avg_reward:.1f} "
+                    f"success={maze_success_rate:.0%}"
+                )
+
     return model
 
 
 def choose_greedy_action(model, maze, state):
     state_tensor = encode_state(maze, state)
+    mask = action_mask(maze, state)
 
     with torch.no_grad():
         logits, _value = model(state_tensor.unsqueeze(0))
+        logits = apply_action_mask(logits, mask.unsqueeze(0))
 
     return torch.argmax(logits, dim=-1).item()
 
@@ -413,6 +479,7 @@ def extract_path(maze, model):
 @dataclass
 class Rollout:
     states: list
+    masks: list
     actions: list
     rewards: list
     dones: list
@@ -420,10 +487,11 @@ class Rollout:
     values: list
 
 def combine_rollouts(rollouts):
-    combined = Rollout([], [], [], [], [], [])
+    combined = Rollout([], [], [], [], [], [], [])
 
     for rollout in rollouts:
         combined.states.extend(rollout.states)
+        combined.masks.extend(rollout.masks)
         combined.actions.extend(rollout.actions)
         combined.rewards.extend(rollout.rewards)
         combined.dones.extend(rollout.dones)

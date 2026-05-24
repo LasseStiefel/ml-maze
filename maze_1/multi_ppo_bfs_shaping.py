@@ -10,13 +10,13 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 import maze_1
-#import maze_11
+import maze_11
 import maze_13
 import maze_14
 
 MAZE_MODULES = [
     maze_1,
-    #maze_11,
+    maze_11,
     maze_13,
     maze_14,
 
@@ -29,17 +29,15 @@ ACTIONS = [
     ("right", (1, 0)),
 ]
 
-
-
-EPISODES = 200
-ROLLOUT_STEPS = 8192     #Amount of game steps to collect before update
-GAMMA = 0.95            #How much future awards matter
+EPISODES = 5000
+ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
+GAMMA = 0.99            #How much future awards matter
 GAE_LAMBDA = 0.95
 CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
-LEARNING_RATE = 3e-4
-UPDATE_EPOCHS = 2
+LEARNING_RATE = 1e-4
+UPDATE_EPOCHS = 4
 MINIBATCH_SIZE = 512
-ENTROPY_COEF = 0.15     #Encourages exploration
+ENTROPY_COEF = 0.1     #Encourages exploration
 VALUE_COEF = 0.5
 
 MAZE_FINISHED = 500
@@ -65,12 +63,24 @@ def build_maze(maze_module):
         ),
     )
 
-def distance_to_exit(maze, state):
-    x, y = state
-    ex, ey = maze.exit
-    return abs(ex - x) + abs(ey - y)
+def build_distance_map(maze):
+    queue = deque([maze.exit])
+    distances = {maze.exit: 0}
 
-def move(maze, state, action_index):
+    while queue:
+        state = queue.popleft()
+        x, y = state
+
+        for _name, (dx, dy) in ACTIONS:
+            next_state = (x + dx, y + dy)
+
+            if maze.is_open(next_state) and next_state not in distances:
+                distances[next_state] = distances[state] + 1
+                queue.append(next_state)
+
+    return distances
+
+def move(maze, state, action_index, distance_map=None):
     _name, (dx, dy) = ACTIONS[action_index]
     x, y = state
     next_state = (x + dx, y + dy)
@@ -82,8 +92,14 @@ def move(maze, state, action_index):
         return next_state, MAZE_FINISHED, True      # reached exit -> reward 100 -> episode done
 
     #return next_state, -1, False    # valid normal step -> move to next state -> reward -1 -> episode not done
-    old_distance = distance_to_exit(maze, state)
-    new_distance = distance_to_exit(maze, next_state)
+    if distance_map is None:
+        return next_state, -1, False
+
+    old_distance = distance_map.get(state)
+    new_distance = distance_map.get(next_state)
+
+    if old_distance is None or new_distance is None:
+        return next_state, -1, False
 
     if new_distance < old_distance:
         return next_state, CLOSER, False
@@ -146,7 +162,7 @@ class ActorCritic(nn.Module):
 
         return action.item(), dist.log_prob(action).squeeze(0), value.squeeze(0)
     
-def collect_rollout(maze, model, max_steps):
+def collect_rollout(maze, model, max_steps, distance_map):
     rollout = Rollout([], [], [], [], [], [])
     episode_rewards = []
     episode_wins = []
@@ -163,7 +179,7 @@ def collect_rollout(maze, model, max_steps):
         with torch.no_grad():
             action, log_prob, value = model.act(state_tensor)
 
-        next_state, reward, done = move(maze, state, action)
+        next_state, reward, done = move(maze, state, action, distance_map)
 
         rollout.states.append(state_tensor)
         rollout.actions.append(action)
@@ -348,6 +364,7 @@ def train(mazes):
 
     model = ActorCritic(input_size, action_size)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    distance_maps = [build_distance_map(maze) for maze in mazes]
 
     recent_wins = deque(maxlen=100)
     recent_rewards = deque(maxlen=100)
@@ -355,10 +372,15 @@ def train(mazes):
     for episode in range(1, EPISODES + 1):
         rollouts = []
 
-        for maze in mazes:
+        for maze, distance_map in zip(mazes, distance_maps):
             max_steps = maze.width * maze.height * 4
 
-            rollout, rewards, wins, visits = collect_rollout(maze, model, max_steps)
+            rollout, rewards, wins, visits = collect_rollout(
+                maze,
+                model,
+                max_steps,
+                distance_map,
+            )
 
             rollouts.append(rollout)
             recent_rewards.extend(rewards)
