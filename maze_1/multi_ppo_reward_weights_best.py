@@ -11,6 +11,7 @@ from torch.distributions import Categorical
 
 import maze_1
 import maze_11
+import maze_12
 import maze_13
 import maze_14
 
@@ -23,15 +24,12 @@ MAX_MAZE_WEIGHT_2 = 4.0
 MIN_MAZE_WEIGHT_h = 1
 MAX_MAZE_WEIGHT_h = 10
 
-
-
 MAZE_MODULES = [
-    maze_14,
-    maze_13,
-    maze_14,
+    maze_1,
     maze_11,
+    maze_12,
     maze_13,
-    maze_14, 
+    maze_14,
 ]
 
 ACTIONS = [
@@ -45,12 +43,16 @@ EPISODES = 2000
 ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
 GAMMA = 0.99            #How much future awards matter
 GAE_LAMBDA = 0.95
-CLIP_EPSILON = 0.3      #Prevent large policy updates (PPO's incremntal learning)
-LEARNING_RATE = 1e-4
+CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
+LEARNING_RATE = 2e-4
 UPDATE_EPOCHS = 4
 MINIBATCH_SIZE = 512
-ENTROPY_COEF = 0.2     #Encourages exploration
+ENTROPY_COEF = 0.12     #Encourages exploration
 VALUE_COEF = 0.5
+HIDDEN_SIZE = 128
+MAX_GRAD_NORM = 0.75
+VALUE_CLIP_EPSILON = 0.2
+TARGET_KL = 0.04
 
 MAZE_FINISHED = 500
 CLOSER = -0.5
@@ -134,12 +136,6 @@ def action_mask(maze, state):
 def apply_action_mask(logits, masks):
     return logits.masked_fill(~masks, -1e9)
 
-def scale_positive_rewards(rewards, reward_weight):
-    return [
-        reward * reward_weight if reward > 0 else reward
-        for reward in rewards
-    ]
-
 def clone_model_state(model):
     return {
         key: value.detach().clone()
@@ -191,14 +187,30 @@ class ActorCritic(nn.Module):
         super().__init__()
 
         self.shared = nn.Sequential(
-            nn.Linear(input_size, 64),
-            nn.Tanh(),
-            nn.Linear(64, 64),
-            nn.Tanh(),
+            nn.Linear(input_size, HIDDEN_SIZE),
+            nn.SiLU(),
+            nn.LayerNorm(HIDDEN_SIZE),
+            nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE),
+            nn.SiLU(),
+            nn.LayerNorm(HIDDEN_SIZE),
+            nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE),
+            nn.SiLU(),
         )
 
-        self.actor = nn.Linear(64, action_size)
-        self.critic = nn.Linear(64, 1)
+        self.actor = nn.Linear(HIDDEN_SIZE, action_size)
+        self.critic = nn.Linear(HIDDEN_SIZE, 1)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.orthogonal_(module.weight, gain=1.4)
+                nn.init.zeros_(module.bias)
+
+        nn.init.orthogonal_(self.actor.weight, gain=0.01)
+        nn.init.zeros_(self.actor.bias)
+        nn.init.orthogonal_(self.critic.weight, gain=1.0)
+        nn.init.zeros_(self.critic.bias)
 
     def forward(self, states):
         hidden = self.shared(states)
@@ -451,7 +463,7 @@ def train(mazes):
                 reward_weight = MIN_MAZE_WEIGHT_h + (
                     MAX_MAZE_WEIGHT_h - MIN_MAZE_WEIGHT_h
                 ) * (1.0 - maze_success_rate)
-            elif maze_index in (1,4):
+            elif maze_index in (1, 4):
                 reward_weight = MIN_MAZE_WEIGHT_2 + (
                     MAX_MAZE_WEIGHT_2 - MIN_MAZE_WEIGHT_2
                 ) * (1.0 - maze_success_rate)
@@ -469,8 +481,14 @@ def train(mazes):
                 mask_cache,
             )
 
-            rollout.rewards = scale_positive_rewards(rollout.rewards, reward_weight)
-            rewards = scale_positive_rewards(rewards, reward_weight)
+            rollout.rewards = [
+                reward * reward_weight
+                for reward in rollout.rewards
+            ]
+            rewards = [
+                reward * reward_weight
+                for reward in rewards
+            ]
 
             rollouts.append(rollout)
             recent_rewards.extend(rewards)
@@ -532,7 +550,7 @@ def train(mazes):
                     f"  maze={maze_index + 1} "
                     f"avg_reward={maze_avg_reward:.1f} "
                     f"success={maze_success_rate:.0%} "
-                    f"positive_weight={reward_weight:.2f}"
+                    f"weight={reward_weight:.2f}"
                 )
 
     model.load_state_dict(best_state)
@@ -603,8 +621,8 @@ def print_training_parameters():
     print()
     print("Training parameters")
     print(f"mazes={[module.__name__ for module in MAZE_MODULES]}")
-    print(f"min_positive_reward_weight={MIN_MAZE_WEIGHT}")
-    print(f"max_positive_reward_weight={MAX_MAZE_WEIGHT}")
+    print(f"min_maze_weight={MIN_MAZE_WEIGHT}")
+    print(f"max_maze_weight={MAX_MAZE_WEIGHT}")
     print(f"episodes={EPISODES}")
     print(f"rollout_steps={ROLLOUT_STEPS}")
     print(f"gamma={GAMMA}")
@@ -627,7 +645,7 @@ def main():
 
     model, best_episode, best_score = train(mazes)
 
-    torch.save(model.state_dict(), "ppo_multi_maze_best.pt")
+    torch.save(model.state_dict(), "ppo_multi_maze_reward_weights_best.pt")
 
     print_training_parameters()
     print(f"loaded_best_episode={best_episode}")
