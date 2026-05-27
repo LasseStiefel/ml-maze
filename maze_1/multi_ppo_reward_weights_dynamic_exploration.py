@@ -24,7 +24,6 @@ MIN_MAZE_WEIGHT_h = 1
 MAX_MAZE_WEIGHT_h = 10
 
 MAZE_MODULES = [
-    maze_14,
     maze_13,
     maze_14,
     maze_11,
@@ -47,7 +46,8 @@ CLIP_EPSILON = 0.3      #Prevent large policy updates (PPO's incremntal learning
 LEARNING_RATE = 1e-4
 UPDATE_EPOCHS = 4
 MINIBATCH_SIZE = 512
-ENTROPY_COEF = 0.25     #Encourages exploration
+ENTROPY_COEF_START = 0.4     # Higher exploration at the beginning
+ENTROPY_COEF_END = 0.03       # Lower exploration near the end
 VALUE_COEF = 0.5
 
 MAZE_FINISHED = 500
@@ -355,7 +355,14 @@ def shortest_path_length(maze):
         
     return None
 
-def update_model(model, optimizer, rollout):
+def entropy_coef_for_episode(episode):
+    if EPISODES <= 1:
+        return ENTROPY_COEF_END
+
+    progress = min(1.0, (episode - 1) / (EPISODES - 1))
+    return ENTROPY_COEF_START + progress * (ENTROPY_COEF_END - ENTROPY_COEF_START)
+
+def update_model(model, optimizer, rollout, entropy_coef):
     states = torch.stack(rollout.states)
     masks = torch.stack(rollout.masks)
     actions = torch.tensor(rollout.actions, dtype=torch.long)
@@ -402,7 +409,7 @@ def update_model(model, optimizer, rollout):
             loss = (
                 policy_loss
                 + VALUE_COEF * value_loss
-                - ENTROPY_COEF * entropy
+                - entropy_coef * entropy
             )
 
             optimizer.zero_grad()
@@ -439,11 +446,11 @@ def train(mazes):
                 sum(maze_recent_wins[maze_index])
                 / max(1, len(maze_recent_wins[maze_index]))
             )
-            if maze_index in (0,2,5):
+            if maze_index in (0,3):
                 reward_weight = MIN_MAZE_WEIGHT_h + (
                     MAX_MAZE_WEIGHT_h - MIN_MAZE_WEIGHT_h
                 ) * (1.0 - maze_success_rate)
-            elif maze_index in (1, 4):
+            elif maze_index in (1,5):
                 reward_weight = MIN_MAZE_WEIGHT_2 + (
                     MAX_MAZE_WEIGHT_2 - MIN_MAZE_WEIGHT_2
                 ) * (1.0 - maze_success_rate)
@@ -477,7 +484,8 @@ def train(mazes):
             maze_recent_wins[maze_index].extend(wins)
 
         combined_rollout = combine_rollouts(rollouts)
-        update_model(model, optimizer, combined_rollout)
+        entropy_coef = entropy_coef_for_episode(episode)
+        update_model(model, optimizer, combined_rollout, entropy_coef)
 
         maze_success_rates = [
             sum(wins) / max(1, len(wins))
@@ -500,6 +508,7 @@ def train(mazes):
                 f"episode={episode} "
                 f"avg_reward={avg_reward:.1f} "
                 f"recent_success={success_rate:.0%} "
+                f"entropy_coef={entropy_coef:.3f} "
                 f"best_episode={best_episode} "
                 f"best_weakest_success={best_score:.2f}"
             )
@@ -513,11 +522,11 @@ def train(mazes):
                     sum(maze_recent_wins[maze_index])
                     / max(1, len(maze_recent_wins[maze_index]))
                 )
-                if maze_index in (0,2,5):
+                if maze_index in (0,3):
                     reward_weight = MIN_MAZE_WEIGHT_h + (
                         MAX_MAZE_WEIGHT_h - MIN_MAZE_WEIGHT_h
                     ) * (1.0 - maze_success_rate)
-                elif maze_index in (1,4):
+                elif maze_index in (1,5):
                     reward_weight = MIN_MAZE_WEIGHT_2 + (
                         MAX_MAZE_WEIGHT_2 - MIN_MAZE_WEIGHT_2
                     ) * (1.0 - maze_success_rate)
@@ -611,7 +620,8 @@ def print_training_parameters():
     print(f"learning_rate={LEARNING_RATE}")
     print(f"update_epochs={UPDATE_EPOCHS}")
     print(f"minibatch_size={MINIBATCH_SIZE}")
-    print(f"entropy_coef={ENTROPY_COEF}")
+    print(f"entropy_coef_start={ENTROPY_COEF_START}")
+    print(f"entropy_coef_end={ENTROPY_COEF_END}")
     print(f"value_coef={VALUE_COEF}")
     print(f"maze_finished_reward={MAZE_FINISHED}")
     print(f"closer_to_exit={CLOSER}")
@@ -625,7 +635,7 @@ def main():
 
     model, best_episode, best_score = train(mazes)
 
-    torch.save(model.state_dict(), "ppo_multi_maze_reward_weights_best.pt")
+    torch.save(model.state_dict(), "ppo_multi_maze_reward_weights_dynamic_exploration.pt")
 
     print_training_parameters()
     print(f"loaded_best_episode={best_episode}")
