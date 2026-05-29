@@ -1,0 +1,152 @@
+================================================================================
+  MACHINE LEARNING — MAZE AGENTS  |  COMMAND REFERENCE
+================================================================================
+
+All commands are run from the "Machine Learning" directory.
+Open a terminal there:  Right-click the folder → "Open in Terminal"
+  or:  cd "C:\Users\ardac\Desktop\Machine Learning"
+
+
+────────────────────────────────────────────────────────────────────────────────
+  STEP 1 — CHOOSE A MAZE
+────────────────────────────────────────────────────────────────────────────────
+
+Open  config.py  and set MAZE_ID at the top:
+
+    MAZE_ID = 1   →  16×16  grid  (easiest, fastest to train)
+    MAZE_ID = 2   →  25×25  grid  (medium)
+    MAZE_ID = 3   →  35×35  grid  (hardest, contains spikes)
+
+Save the file, then run whichever agent you want below.
+
+
+────────────────────────────────────────────────────────────────────────────────
+  STEP 2 — RUN AN AGENT
+────────────────────────────────────────────────────────────────────────────────
+
+  DQN  (Deep Q-Network — TensorFlow)
+  ───────────────────────────────────
+  Full training + visualisation:
+      python agents/dqn_train.py
+
+  DQN2  (Deep Q-Network — PyTorch, one-hot state encoding)
+  ──────────────────────────────────────────────────────────
+  Full training + visualisation:
+      python agents/dqn2_train.py
+
+  SAC  (Soft Actor-Critic — stable-baselines3)
+  ─────────────────────────────────────────────
+  Full training + visualisation:
+      python agents/sac_train.py
+
+  Test only (skip training, load saved model):
+      python agents/sac_train.py --test-only
+      NOTE: a saved model must already exist in Results/SAC/ for this to work.
+
+  SARSA  (On-policy tabular TD control)
+  ──────────────────────────────────────
+  Full training + visualisation:
+      python agents/sarsa_train.py
+
+
+────────────────────────────────────────────────────────────────────────────────
+  STEP 3 — CHECK THE OUTPUT
+────────────────────────────────────────────────────────────────────────────────
+
+Results are saved to separate folders per agent:
+
+  Results/DQN/
+      training_DQN_maze<N>.csv          per-episode stats (reward, steps, loss, ε)
+      q_network_maze<N>.keras           trained model weights
+      maze_layout_maze<N>.png           maze map with BFS optimal path
+      episode_animation_maze<N>.gif     animated test episode
+      training_plot_maze<N>.png         2×2 learning-curve figure
+
+  Results/DQN2/
+      training_DQN2_maze<N>.csv         per-episode stats (reward, steps, loss, ε)
+      dqn2_model_maze<N>.pt             trained model weights (PyTorch)
+      maze_layout_maze<N>.png           maze map with BFS optimal path
+      episode_animation_maze<N>.gif     animated test episode
+      training_plot_DQN2_maze<N>.png    2×2 learning-curve figure
+
+  Results/SAC/
+      training_SAC_maze<N>.csv          per-episode stats
+      sac_model_maze<N>.zip             final trained model
+      sac_best_maze<N>.zip              best checkpoint saved during training
+      maze_layout_maze<N>.png           maze map with BFS optimal path
+      episode_animation_maze<N>.gif     animated test episode
+      training_plot_SAC_maze<N>.png     2×2 learning-curve figure
+
+  Results/SARSA/
+      training_SARSA_maze<N>.csv        per-episode stats (reward, steps, ε)
+      maze_layout_maze<N>.png           maze map with BFS optimal path
+      episode_animation_maze<N>.gif     animated test episode
+      training_plot_SARSA_maze<N>.png   2×2 learning-curve figure
+
+  <N> is the MAZE_ID you set in config.py.
+
+
+────────────────────────────────────────────────────────────────────────────────
+  QUICK TUNING REFERENCE  (config.py)
+────────────────────────────────────────────────────────────────────────────────
+
+  DQN — key values to change:
+      EPISODES        how many training episodes          (default 100)
+      EPSILON_DECAY   how fast exploration drops          (default 0.995)
+      LEARNING_RATE   Adam step size                      (default 0.001)
+      GAMMA           discount factor                     (default 0.99)
+
+  DQN2 — key values to change:
+      EPISODES           how many training episodes       (default 1000)
+      EPSILON_DECAY      how fast exploration drops       (default 0.997)
+      LEARNING_RATE      Adam step size                   (default 0.001)
+      HIDDEN_SIZE        neurons per hidden layer         (default 128)
+      TARGET_UPDATE_FREQ sync target net every N steps   (default 200)
+
+  SAC — key values to change:
+      TIMESTEPS       total environment steps to train    (default 10 000)
+      LEARNING_RATE   actor/critic/alpha step size        (default 3e-4)
+      HIDDEN_SIZE     neurons per hidden layer            (default 256)
+      EXIT_REWARD     reward for reaching the exit        (default 200.0)
+
+  SARSA — key values to change:
+      EPISODES        how many training episodes          (default 5000)
+      ALPHA           learning rate                       (default 0.1)
+      GAMMA           discount factor                     (default 0.95)
+      EPSILON_DECAY   how fast exploration drops          (default 0.995)
+
+
+────────────────────────────────────────────────────────────────────────────────
+  PROJECT LAYOUT
+────────────────────────────────────────────────────────────────────────────────
+
+  Machine Learning/
+  ├── config.py              ← maze selection + all hyperparameters
+  ├── visualisation.py       ← shared visualisation utilities (maze, GIF, plots)
+  ├── agents/
+  │   ├── dqn_train.py       ← DQN agent (TensorFlow)
+  │   ├── dqn2_train.py      ← DQN2 agent (PyTorch, one-hot states)
+  │   ├── sac_train.py       ← SAC agent
+  │   └── sarsa_train.py     ← SARSA agent
+  ├── maps/
+  │   ├── maze_1/            ← 16×16 maze definition + environment
+  │   ├── maze_2/            ← 25×25 maze definition + environment
+  │   └── maze_3/            ← 35×35 maze definition + environment (spikes)
+  └── Results/
+      ├── DQN/               ← all DQN output files
+      ├── SAC/               ← all SAC output files
+      ├── DQN2/              ← all DQN2 output files
+      └── SARSA/             ← all SARSA output files
+
+
+────────────────────────────────────────────────────────────────────────────────
+  DEPENDENCIES
+────────────────────────────────────────────────────────────────────────────────
+
+Install once:
+    pip install tensorflow numpy matplotlib stable-baselines3 gymnasium
+
+TensorFlow requires Python 3.8–3.11.
+stable-baselines3 requires PyTorch (installed automatically via pip).
+
+================================================================================
