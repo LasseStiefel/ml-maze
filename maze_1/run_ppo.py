@@ -71,7 +71,7 @@ def main():
     action_size = len(ACTIONS)
 
     model = ActorCritic(input_size, action_size)
-    model.load_state_dict(torch.load("bestWeight_11_13.pt"))
+    model.load_state_dict(torch.load("ppo_maze_1.pt"))
     model.eval()
 
     print_step_by_step_path(maze, model)

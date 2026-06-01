@@ -318,9 +318,11 @@ def train(maze):
     recent_rewards = deque(maxlen=100)
 
     all_visits = {}
+    total_env_steps = 0
 
     for episode in range(1, EPISODES + 1):
         rollout, rewards, wins, visits = collect_rollout(maze, model, max_steps)
+        total_env_steps += len(rollout.states)
 
         for cell, count in visits.items():
             all_visits[cell] = all_visits.get(cell, 0) + count
@@ -336,10 +338,12 @@ def train(maze):
 
             print(
                 f"episode={episode} "
+                f"env_steps={total_env_steps} "
                 f"avg_reward={avg_reward:.1f} "
                 f"recent_success={success_rate:.0%}"
             )
 
+    print(f"total_env_steps={total_env_steps}")
     return model, all_visits
 
 def choose_greedy_action(model, maze, state):
