@@ -9,19 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 
-import maze_1
-import maze_11
-import maze_13
-import maze_14
-
-MAZE_MODULES = [
-    maze_14,
-    maze_13,
-    #maze_1,
-    maze_11,
-    maze_13,
-    maze_14, 
-]
+import maze_2 as maze_file
 
 ACTIONS = [
     ("up", (0, -1)),
@@ -30,43 +18,39 @@ ACTIONS = [
     ("right", (1, 0)),
 ]
 
-EPISODES = 500
-ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
-GAMMA = 0.99            #How much future awards matter
+MAZE_FINISHED = 100
+CLOSER = 0.2
+FURTHER = -0.2
+
+EPISODES = 400
+ROLLOUT_STEPS = 2048     #Amount of game steps to collect before update
+GAMMA = 0.95            #How much future awards matter
 GAE_LAMBDA = 0.95
-CLIP_EPSILON = 0.15      #Prevent large policy updates (PPO's incremntal learning)
-LEARNING_RATE = 2e-5
-UPDATE_EPOCHS = 2
-MINIBATCH_SIZE = 512
+CLIP_EPSILON = 0.2      #Prevent large policy updates (PPO's incremntal learning)
+LEARNING_RATE = 3e-4
+UPDATE_EPOCHS = 6
+MINIBATCH_SIZE = 128
 ENTROPY_COEF = 0.1     #Encourages exploration
 VALUE_COEF = 0.5
 
-MAZE_FINISHED = 500
-CLOSER = -0.5
-FURTHER = -0.5
 
 # Builds Maze by getting dimenstions from maze.py. Uses build_walls function from maze.py1
-def build_maze(maze_module):
-    width = maze_module.DEFAULT_WIDTH
-    height = maze_module.DEFAULT_HEIGHT
-    exit_cell = maze_module.resolve_exit(width, height)
+def build_maze():
+    width = maze_file.DEFAULT_WIDTH
+    height = maze_file.DEFAULT_HEIGHT
+    exit_cell = maze_file.resolve_exit(width, height)
 
-    return maze_module.Maze(
+    return maze_file.Maze(
         width=width,
         height=height,
-        start=maze_module.START,
+        start=maze_file.START,
         exit=exit_cell,
-        walls=maze_module.build_walls(
-            width,
-            height, 
-            maze_module.START,
-            exit_cell,
-        ),
+        walls=maze_file.build_walls(width, height, maze_file.START, exit_cell),
     )
 
 def build_distance_map(maze):
-    queue = deque([maze.exit])
     distances = {maze.exit: 0}
+    queue = deque([maze.exit])
 
     while queue:
         state = queue.popleft()
@@ -81,6 +65,7 @@ def build_distance_map(maze):
 
     return distances
 
+
 def move(maze, state, action_index, distance_map=None):
     _name, (dx, dy) = ACTIONS[action_index]
     x, y = state
@@ -92,50 +77,16 @@ def move(maze, state, action_index, distance_map=None):
     if next_state == maze.exit:
         return next_state, MAZE_FINISHED, True      # reached exit -> reward 100 -> episode done
 
-    #return next_state, -1, False    # valid normal step -> move to next state -> reward -1 -> episode not done
     if distance_map is None:
         return next_state, -1, False
 
-    old_distance = distance_map.get(state)
-    new_distance = distance_map.get(next_state)
-
-    if old_distance is None or new_distance is None:
-        return next_state, -1, False
-
-    if new_distance < old_distance:
+    if distance_map[next_state] < distance_map[state]:
         return next_state, CLOSER, False
 
-    if new_distance > old_distance:
+    if distance_map[next_state] > distance_map[state]:
         return next_state, FURTHER, False
 
     return next_state, -1, False
-
-def action_mask(maze, state):
-    x, y = state
-    return torch.tensor(
-        [
-            maze.is_open((x + dx, y + dy))
-            for _name, (dx, dy) in ACTIONS
-        ],
-        dtype=torch.bool,
-    )
-
-def apply_action_mask(logits, masks):
-    return logits.masked_fill(~masks, -1e9)
-
-def build_observation_cache(maze):
-    states = {}
-    masks = {}
-
-    for y in range(maze.height):
-        for x in range(maze.width):
-            state = (x, y)
-
-            if maze.is_open(state):
-                states[state] = encode_state(maze, state)
-                masks[state] = action_mask(maze, state)
-
-    return states, masks
 
 # is the devision by maze size necessary or maybe a codex complication ?
 def encode_state(maze, state):
@@ -183,16 +134,15 @@ class ActorCritic(nn.Module):
         values = self.critic(hidden).squeeze(-1)
         return logits, values
 
-    def act(self, state_tensor, mask):
+    def act(self, state_tensor):
         logits, value = self.forward(state_tensor.unsqueeze(0))
-        masked_logits = apply_action_mask(logits, mask.unsqueeze(0))
-        dist = Categorical(logits=masked_logits)
+        dist = Categorical(logits=logits)
         action = dist.sample()
 
         return action.item(), dist.log_prob(action).squeeze(0), value.squeeze(0)
     
-def collect_rollout(maze, model, max_steps, distance_map, state_cache, mask_cache):
-    rollout = Rollout([], [], [], [], [], [], [])
+def collect_rollout(maze, model, max_steps, distance_map):
+    rollout = Rollout([], [], [], [], [], [])
     episode_rewards = []
     episode_wins = []
     visits = {}
@@ -202,17 +152,15 @@ def collect_rollout(maze, model, max_steps, distance_map, state_cache, mask_cach
     episode_step = 0
 
     while len(rollout.states) < ROLLOUT_STEPS:
-        state_tensor = state_cache[state]
-        mask = mask_cache[state]
+        state_tensor = encode_state(maze, state)
         visits[state] = visits.get(state, 0) + 1
 
         with torch.no_grad():
-            action, log_prob, value = model.act(state_tensor, mask)
+            action, log_prob, value = model.act(state_tensor)
 
         next_state, reward, done = move(maze, state, action, distance_map)
 
         rollout.states.append(state_tensor)
-        rollout.masks.append(mask)
         rollout.actions.append(action)
         rollout.rewards.append(reward)
         rollout.dones.append(done)
@@ -227,8 +175,6 @@ def collect_rollout(maze, model, max_steps, distance_map, state_cache, mask_cach
         if timed_out and not done:
             rollout.rewards[-1] += -50
             episode_reward += -50
-            rollout.dones[-1] = True
-
 
         if done or timed_out: 
             episode_rewards.append(episode_reward)
@@ -255,10 +201,9 @@ def compute_advantages(rollout):
         delta = rewards[step] + GAMMA * next_value * mask - values[step].item()
         gae = delta + GAMMA * GAE_LAMBDA * mask * gae
 
-        advantages.append(gae)
+        advantages.insert(0, gae)
         next_value = values[step].item()
 
-    advantages.reverse()
     advantages = torch.tensor(advantages, dtype=torch.float32)
     returns = advantages + values.detach()
 
@@ -342,7 +287,6 @@ def shortest_path_length(maze):
 
 def update_model(model, optimizer, rollout):
     states = torch.stack(rollout.states)
-    masks = torch.stack(rollout.masks)
     actions = torch.tensor(rollout.actions, dtype=torch.long)
     old_log_probs = torch.stack(rollout.log_probs).detach()
 
@@ -363,10 +307,7 @@ def update_model(model, optimizer, rollout):
             batch_advantages = advantages[batch_indices]
             batch_returns = returns[batch_indices]
 
-            batch_masks = masks[batch_indices]
-
             logits, values = model(batch_states)
-            logits = apply_action_mask(logits, batch_masks)
             dist = Categorical(logits=logits)
 
             new_log_probs = dist.log_prob(batch_actions)
@@ -394,47 +335,32 @@ def update_model(model, optimizer, rollout):
             loss.backward()
             optimizer.step()
 
-def train(mazes):
-    input_size = len(encode_state(mazes[0], mazes[0].start))
+def train(maze):
+    input_size = len(encode_state(maze, maze.start))
     action_size = len(ACTIONS)
 
     model = ActorCritic(input_size, action_size)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    distance_maps = [build_distance_map(maze) for maze in mazes]
-    observation_caches = [build_observation_cache(maze) for maze in mazes]
 
+    max_steps = maze.width * maze.height * 4
+    distance_map = build_distance_map(maze)
     recent_wins = deque(maxlen=100)
     recent_rewards = deque(maxlen=100)
 
-    maze_recent_wins = [deque(maxlen=100) for _ in mazes]
-    maze_recent_rewards = [deque(maxlen=100) for _ in mazes]
+    all_visits = {}
+    total_env_steps = 0
 
     for episode in range(1, EPISODES + 1):
-        rollouts = []
+        rollout, rewards, wins, visits = collect_rollout(maze, model, max_steps, distance_map)
+        total_env_steps += len(rollout.states)
 
-        for maze_index, (maze, distance_map, observation_cache) in enumerate(
-            zip(mazes, distance_maps, observation_caches)
-        ):
-            max_steps = maze.width * maze.height * 4
-            state_cache, mask_cache = observation_cache
+        for cell, count in visits.items():
+            all_visits[cell] = all_visits.get(cell, 0) + count
 
-            rollout, rewards, wins, visits = collect_rollout(
-                maze,
-                model,
-                max_steps,
-                distance_map,
-                state_cache,
-                mask_cache,
-            )
+        update_model(model, optimizer, rollout)
 
-            rollouts.append(rollout)
-            recent_rewards.extend(rewards)
-            recent_wins.extend(wins)
-            maze_recent_rewards[maze_index].extend(rewards)
-            maze_recent_wins[maze_index].extend(wins)
-
-        combined_rollout = combine_rollouts(rollouts)
-        update_model(model, optimizer, combined_rollout)
+        recent_rewards.extend(rewards)
+        recent_wins.extend(wins)
 
         if episode % 50 == 0:
             avg_reward = sum(recent_rewards) / max(1, len(recent_rewards))
@@ -442,51 +368,30 @@ def train(mazes):
 
             print(
                 f"episode={episode} "
+                f"env_steps={total_env_steps} "
                 f"avg_reward={avg_reward:.1f} "
                 f"recent_success={success_rate:.0%}"
             )
 
-            for maze_index in range(len(mazes)):
-                maze_avg_reward = (
-                    sum(maze_recent_rewards[maze_index])
-                    / max(1, len(maze_recent_rewards[maze_index]))
-                )
-                maze_success_rate = (
-                    sum(maze_recent_wins[maze_index])
-                    / max(1, len(maze_recent_wins[maze_index]))
-                )
+    print(f"total_env_steps={total_env_steps}")
+    return model, all_visits
 
-                print(
-                    f"  maze={maze_index + 1} "
-                    f"avg_reward={maze_avg_reward:.1f} "
-                    f"success={maze_success_rate:.0%}"
-                )
-
-    return model
-
-
-def choose_greedy_action(model, maze, state, state_cache=None, mask_cache=None):
-    if state_cache is None or mask_cache is None:
-        state_tensor = encode_state(maze, state)
-        mask = action_mask(maze, state)
-    else:
-        state_tensor = state_cache[state]
-        mask = mask_cache[state]
+def choose_greedy_action(model, maze, state):
+    state_tensor = encode_state(maze, state)
 
     with torch.no_grad():
         logits, _value = model(state_tensor.unsqueeze(0))
-        logits = apply_action_mask(logits, mask.unsqueeze(0))
 
     return torch.argmax(logits, dim=-1).item()
 
 
-def extract_path(maze, model, state_cache=None, mask_cache=None):
+def extract_path(maze, model):
     state = maze.start
     path = [state]
     max_steps = maze.width * maze.height * 4
 
     for _ in range(max_steps):
-        action = choose_greedy_action(model, maze, state, state_cache, mask_cache)
+        action = choose_greedy_action(model, maze, state)
         next_state, _reward, done = move(maze, state, action)
 
         if next_state == state:
@@ -504,69 +409,30 @@ def extract_path(maze, model, state_cache=None, mask_cache=None):
 @dataclass
 class Rollout:
     states: list
-    masks: list
     actions: list
     rewards: list
     dones: list
     log_probs: list
     values: list
 
-def combine_rollouts(rollouts):
-    combined = Rollout([], [], [], [], [], [], [])
-
-    for rollout in rollouts:
-        combined.states.extend(rollout.states)
-        combined.masks.extend(rollout.masks)
-        combined.actions.extend(rollout.actions)
-        combined.rewards.extend(rollout.rewards)
-        combined.dones.extend(rollout.dones)
-        combined.log_probs.extend(rollout.log_probs)
-        combined.values.extend(rollout.values)
-
-    return combined
-
-def print_training_parameters():
-    print()
-    print("Training parameters")
-    print(f"mazes={[module.__name__ for module in MAZE_MODULES]}")
-    print(f"episodes={EPISODES}")
-    print(f"rollout_steps={ROLLOUT_STEPS}")
-    print(f"gamma={GAMMA}")
-    print(f"gae_lambda={GAE_LAMBDA}")
-    print(f"clip_epsilon={CLIP_EPSILON}")
-    print(f"learning_rate={LEARNING_RATE}")
-    print(f"update_epochs={UPDATE_EPOCHS}")
-    print(f"minibatch_size={MINIBATCH_SIZE}")
-    print(f"entropy_coef={ENTROPY_COEF}")
-    print(f"value_coef={VALUE_COEF}")
-    print(f"maze_finished_reward={MAZE_FINISHED}")
-    print(f"closer_to_exit={CLOSER}")
-    print(f"further_from_exit={FURTHER}")
-
 def main():
     random.seed(1)
     torch.manual_seed(1)
 
-    mazes = [build_maze(module) for module in MAZE_MODULES]
+    maze = build_maze()
+    model, all_visits = train(maze)
+    torch.save(model.state_dict(), "ppo_maze_2_simple_shaping.pt")
 
-    model = train(mazes)
+    path = extract_path(maze, model)
 
-    torch.save(model.state_dict(), "ppo_multi_maze.pt")
+    print()
+    print(f"learned_path_length={len(path) - 1}")
+    print(f"shortest_path_length={shortest_path_length(maze)}")
+    print(f"reached_exit={path[-1] == maze.exit}")
 
-    print_training_parameters()
-
-    for index, maze in enumerate(mazes, start=1):
-        state_cache, mask_cache = build_observation_cache(maze)
-        path = extract_path(maze, model, state_cache, mask_cache)
-
-        print()
-        print(f"maze={index}")
-        print(f"learned_path_length={len(path) - 1}")
-        print(f"shortest_path_length={shortest_path_length(maze)}")
-        print(f"reached_exit={path[-1] == maze.exit}")
-        print()
-        print_path(maze, path)
-
+    print_heatmap(maze, all_visits)
+    print()
+    print_path(maze, path)
 
 
 if __name__ == "__main__":

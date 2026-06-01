@@ -10,15 +10,11 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 import maze_1
-import maze_11
-import maze_13
-import maze_14
+import maze_2
+import maze_3
 
 MAZE_MODULES = [
-    maze_1,
-    maze_11,
-    maze_13,
-    maze_14,
+    maze_1
 
 ]
 
@@ -29,7 +25,7 @@ ACTIONS = [
     ("right", (1, 0)),
 ]
 
-EPISODES = 5000
+EPISODES = 500
 ROLLOUT_STEPS = 4096     #Amount of game steps to collect before update
 GAMMA = 0.99            #How much future awards matter
 GAE_LAMBDA = 0.95
@@ -480,7 +476,7 @@ def main():
 
     model = train(mazes)
 
-    torch.save(model.state_dict(), "ppo_multi_maze.pt")
+    torch.save(model.state_dict(), "ppo_multi_maze_final_m1.pt")
 
     print_training_parameters()
 

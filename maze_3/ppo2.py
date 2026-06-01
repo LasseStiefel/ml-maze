@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 
-import maze_2 as maze_file
+import maze_3 as maze_file
 
 ACTIONS = [
     ("up", (0, -1)),
@@ -492,7 +492,7 @@ def main():
 
     maze = build_maze()
     model, all_visits = train(maze)
-    torch.save(model.state_dict(), "ppo_maze_2.pt")
+    torch.save(model.state_dict(), "ppo_maze_33.pt")
 
     path = extract_path(maze, model)
 
