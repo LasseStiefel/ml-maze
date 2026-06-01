@@ -23,13 +23,7 @@ ACTIONS = [
     ("left", (-1, 0)),
     ("right", (1, 0)),
 ]
-
-BASE_FEATURES = 14
-VALID_FEATURE_START = BASE_FEATURES
-WALL_FEATURE_START = VALID_FEATURE_START + len(ACTIONS)
-PROGRESS_FEATURE_START = WALL_FEATURE_START + len(ACTIONS)
-RAW_PROGRESS_FEATURE_START = PROGRESS_FEATURE_START + len(ACTIONS)
-NEIGHBOR_DISTANCE_FEATURE_START = RAW_PROGRESS_FEATURE_START + len(ACTIONS)
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 @dataclass
@@ -58,7 +52,6 @@ class TrainConfig:
     progress_reward: float = 0.20
     repeat_penalty: float = -0.015
     timeout_penalty: float = -5.0
-    distance_prior_scale: float = 3.0
     eval_every: int = 10
     early_stop_patience: int = 3
 
@@ -184,11 +177,6 @@ def policy_logits_and_value(
     config: TrainConfig,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     logits, values = model(obs, task_ids)
-    distance_prior = obs[
-        :,
-        RAW_PROGRESS_FEATURE_START : RAW_PROGRESS_FEATURE_START + len(ACTIONS),
-    ]
-    logits = logits + config.distance_prior_scale * distance_prior
     return apply_action_mask(logits, masks), values
 
 
@@ -310,63 +298,21 @@ def encode_state(
     ex, ey = maze.exit
     width_scale = max(1, maze.width - 1)
     height_scale = max(1, maze.height - 1)
-    global_width_scale = max(1, max_width)
-    global_height_scale = max(1, max_height)
-    distance_scale = max(1, max_distance)
-    current_distance = distance_map[state]
 
-    valid_moves = []
-    wall_bits = []
-    progress = []
-    raw_progress = []
-    neighbor_distances = []
-
-    for _name, (dx, dy) in ACTIONS:
-        next_state = (x + dx, y + dy)
-        is_valid = maze.is_open(next_state) and next_state in distance_map
-        valid_moves.append(1.0 if is_valid else 0.0)
-        wall_bits.append(0.0 if is_valid else 1.0)
-
-        if is_valid:
-            next_distance = distance_map[next_state]
-            distance_delta = current_distance - next_distance
-            progress.append(distance_delta / distance_scale)
-            raw_progress.append(float(max(-1, min(1, distance_delta))))
-            neighbor_distances.append(next_distance / distance_scale)
-        else:
-            progress.append(-1.0)
-            raw_progress.append(-1.0)
-            neighbor_distances.append(1.0)
-
-    manhattan = abs(ex - x) + abs(ey - y)
-    euclidean = math.sqrt((ex - x) ** 2 + (ey - y) ** 2)
-    max_manhattan = max(1, maze.width + maze.height - 2)
-    max_euclidean = max(1.0, math.sqrt(width_scale**2 + height_scale**2))
-    degree = sum(valid_moves) / len(ACTIONS)
+    wall_up = 0.0 if maze.is_open((x, y - 1)) else 1.0
+    wall_down = 0.0 if maze.is_open((x, y + 1)) else 1.0
+    wall_left = 0.0 if maze.is_open((x - 1, y)) else 1.0
+    wall_right = 0.0 if maze.is_open((x + 1, y)) else 1.0
 
     features = [
         x / width_scale,
         y / height_scale,
-        ex / width_scale,
-        ey / height_scale,
         (ex - x) / width_scale,
         (ey - y) / height_scale,
-        abs(ex - x) / width_scale,
-        abs(ey - y) / height_scale,
-        maze.width / global_width_scale,
-        maze.height / global_height_scale,
-        current_distance / distance_scale,
-        1.0 - current_distance / distance_scale,
-        manhattan / max_manhattan,
-        euclidean / max_euclidean,
-        *valid_moves,
-        *wall_bits,
-        *progress,
-        *raw_progress,
-        *neighbor_distances,
-        degree,
-        1.0 if state == maze.start else 0.0,
-        1.0 if state == maze.exit else 0.0,
+        wall_up,
+        wall_down,
+        wall_left,
+        wall_right,
     ]
     return torch.tensor(features, dtype=torch.float32)
 
@@ -1131,10 +1077,17 @@ def set_reproducible(seed: int) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Discover every maze_*.py file and train a strong masked PPO policy."
+        description=(
+            "Discover every maze_*.py file and train a masked PPO policy using "
+            "only the original 8 observation features."
+        )
     )
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent)
-    parser.add_argument("--output", type=Path, default=Path("weights/ultimate_multi_ppo_all_mazes.pt"))
+    parser.add_argument("--root", type=Path, default=REPO_ROOT)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("complex/weights/ultimate_multi_ppo_original_features.pt"),
+    )
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=TrainConfig.seed)
     parser.add_argument("--bc-epochs", type=int, default=TrainConfig.bc_epochs)
@@ -1143,7 +1096,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hidden-size", type=int, default=TrainConfig.hidden_size)
     parser.add_argument("--eval-every", type=int, default=TrainConfig.eval_every)
     parser.add_argument("--early-stop-patience", type=int, default=TrainConfig.early_stop_patience)
-    parser.add_argument("--distance-prior-scale", type=float, default=TrainConfig.distance_prior_scale)
     parser.add_argument("--print-paths", action="store_true")
     parser.add_argument("--no-save", action="store_true")
     parser.add_argument(
@@ -1163,7 +1115,6 @@ def config_from_args(args: argparse.Namespace) -> TrainConfig:
         hidden_size=args.hidden_size,
         eval_every=args.eval_every,
         early_stop_patience=args.early_stop_patience,
-        distance_prior_scale=args.distance_prior_scale,
     )
 
     if args.smoke:

@@ -1,0 +1,4 @@
+model,size,maze,maze_seed,train_seed,shortest,final_solved,final_optimal,final_path_len,final_looped,first_solved_phase,first_solved_step,first_solved_env_steps,first_solved_expert_epochs,first_solved_seconds,first_optimal_phase,first_optimal_step,first_optimal_env_steps,first_optimal_expert_epochs,first_optimal_seconds
+compact_ppo,small,small_00,100,7,30,True,True,30,False,bc,1,0,1,1.3692,bc,1,0,1,1.3692
+compact_ppo,medium,medium_00,200,7,96,True,True,96,False,bc,250,0,250,0.8197,bc,250,0,250,0.8197
+compact_ppo,large,large_00,300,7,204,True,True,204,False,bc,750,0,750,3.2596,bc,750,0,750,3.2596

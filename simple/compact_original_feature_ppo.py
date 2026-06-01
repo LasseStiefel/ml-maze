@@ -18,6 +18,7 @@ from torch.distributions import Categorical
 
 
 ACTIONS = [("up", (0, -1)), ("down", (0, 1)), ("left", (-1, 0)), ("right", (1, 0))]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 @dataclass
@@ -487,8 +488,8 @@ def save(output: Path, model: ActorCritic, tasks: list[Task], cfg: Config, rows:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Compact all-maze PPO using the original 8 state features.")
-    p.add_argument("--root", type=Path, default=Path(__file__).resolve().parent)
-    p.add_argument("--output", type=Path, default=Path("weights/compact_original_feature_ppo.pt"))
+    p.add_argument("--root", type=Path, default=REPO_ROOT)
+    p.add_argument("--output", type=Path, default=Path("simple/weights/compact_original_feature_ppo.pt"))
     p.add_argument("--device", default="auto")
     p.add_argument("--seed", type=int, default=Config.seed)
     p.add_argument("--bc-epochs", type=int, default=Config.bc_epochs)
