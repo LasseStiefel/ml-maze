@@ -1,0 +1,44 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{parskip}
+
+\title{Difference Between PPO and PPO2}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+Compared to \texttt{ppo.py} in the maze 1 folder, \texttt{ppo2.py} uses more
+guidance to solve a larger maze. The general PPO structure is the same, but it
+adds BFS reward shaping, action masking, behavior cloning, and saving the best
+model found during training.
+
+The original reward function gives 100 points for reaching the exit, -1 point
+for every normal step, -5 points for a wall hit, and an additional timeout
+penalty of -50 points. In \texttt{ppo2.py}, BFS is used to calculate the
+shortest distance from every position to the exit. A step toward the exit gives
+0.17 points, while a step away from the exit gives -0.23 points. This tells the
+model whether a move was useful.
+
+The same eight features are used: the current position, the direction toward
+the exit, and four flags describing whether the surrounding walls are blocked.
+The BFS distance is only used to calculate rewards and is not given to the
+model as an input feature.
+
+\texttt{ppo2.py} also uses action masking. Moves that would hit a wall or leave
+the maze are removed from the possible choices. This prevents the model from
+wasting training steps on invalid moves.
+
+Before PPO training begins, the model uses behavior cloning. BFS identifies
+actions that move closer to the exit, and the model studies these correct
+actions for 3000 epochs. Therefore, \texttt{ppo2.py} is not a pure
+trial-and-error PPO model. It is behavior cloning followed by PPO fine-tuning.
+
+The remaining PPO training is mostly unchanged. Each rollout gathers 2048
+steps and is used for six training passes. Finally, \texttt{ppo2.py} remembers
+the best model found during training and restores it before saving the weights.
+
+\end{document}

@@ -10,17 +10,14 @@ import torch.optim as optim
 from torch.distributions import Categorical
 
 import maze_1
-import maze_11
-import maze_13
-import maze_14
+
+import maze_3
+
 
 MAZE_MODULES = [
     maze_1,
-    maze_11,
-    maze_13,
-    maze_13,
-    maze_14, 
-    maze_14,
+    maze_3
+    
 ]
 
 ACTIONS = [
